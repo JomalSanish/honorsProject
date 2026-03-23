@@ -1,0 +1,26 @@
+#input-section {
+  margin: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+textarea {
+  height: 100px;
+}
+
+button {
+  padding: 10px;
+  cursor: pointer;
+}
+
+#results {
+  margin: 20px;
+}
+
+.card {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin: 10px 0;
+  border-radius: 8px;
+}
