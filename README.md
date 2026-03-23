@@ -1,9 +1,11 @@
-# IntelliPlace – AI Resume Ranking System
+# Resume Analyzer – AI Resume Ranking System
 
 ## 📌 Overview
 
-IntelliPlace is an AI-powered resume screening system designed for **recruiters** to streamline candidate shortlisting.
-It analyses multiple resumes against a job description and ranks candidates based on **semantic relevance**, making hiring faster and more consistent.
+Resume Analyzer is an AI-powered resume screening system designed to help **recruiters efficiently shortlist candidates**.
+It analyses multiple resumes against a job description and ranks candidates using a combination of **semantic similarity and structured scoring**.
+
+The system reduces manual effort and provides **explainable insights** into candidate suitability.
 
 ---
 
@@ -12,58 +14,92 @@ It analyses multiple resumes against a job description and ranks candidates base
 * Upload **Job Description** (PDF/DOCX or text)
 * Upload **multiple resumes** (PDF/DOCX)
 * AI-based **semantic similarity matching (Sentence-BERT)**
+* Hybrid scoring using:
+
+  * Semantic relevance
+  * Skill matching
+  * Experience
+  * Projects
+  * Education
 * Automatic **candidate ranking**
 * **Explainable results**:
 
   * Extracted skills
   * Matched skills
   * Missing skills
-* Candidate **name extraction**
+  * Score breakdown
+* Basic **candidate name extraction**
 
 ---
 
-## 🧠 Methodology (ML Pipeline)
+## 🧠 Methodology (Pipeline)
 
-1. **Text Extraction**
+### 1. Input Module
 
-   * Parse resumes and JD from PDF/DOCX
-   * Convert to clean text
+* Accept resumes and job descriptions (PDF/DOCX/text)
+* Extract raw text using file parsers
 
-2. **Resume Parsing**
+---
 
-   * Extract:
+### 2. Text Processing Module
 
-     * Skills
-     * Experience
-     * Projects
-     * Education
-     * Name
+* Clean and normalise text (lowercasing, removing noise)
+* Used for semantic comparison
 
-3. **Semantic Matching**
+---
 
-   * Use **Sentence-BERT embeddings**
-   * Compute similarity:
+### 3. Feature Extraction
 
-     * Resume ↔ Job Description
+From resumes and job descriptions:
 
-4. **Skill Comparison**
+* Skills
+* Experience (years)
+* Projects
+* Education
+* Name
 
-   * Extract skills from JD
-   * Compare with resume:
+---
 
-     * Matched skills
-     * Missing skills
+### 4. Semantic Matching
 
-5. **Ranking**
+* Use **Sentence-BERT (all-MiniLM-L6-v2)**
+* Compute cosine similarity:
 
-   * Rank candidates by **semantic similarity score**
+  * Resume ↔ Job Description
 
-6. **Explainability**
+---
 
-   * Provide insights into:
+### 5. Scoring System (Hybrid)
 
-     * What matched
-     * What is missing
+Final score is computed using weighted features:
+
+* Semantic similarity
+* Skill match ratio
+* Experience score
+* Project score
+* Education match
+
+#### ⚠️ Role-Aware Adjustment
+
+* If semantic similarity is low, a **penalty is applied**
+* Prevents mismatched roles (e.g., developer resume for sales job)
+
+---
+
+### 6. Ranking
+
+* Candidates are ranked based on final score
+* Highest score = best match
+
+---
+
+### 7. Explainability
+
+For each candidate:
+
+* Matched skills
+* Missing skills
+* Score breakdown (semantic, skills, experience, etc.)
 
 ---
 
@@ -72,14 +108,15 @@ It analyses multiple resumes against a job description and ranks candidates base
 ### Backend
 
 * FastAPI
-* spaCy (NLP)
 * Sentence-Transformers (SBERT)
 * pdfplumber, python-docx
+* Regex-based parsing
 
 ### Frontend
 
 * React (Vite)
 * JSX
+* CSS
 
 ---
 
@@ -91,6 +128,8 @@ honorsProject/
 │── services/
 │   ├── resume_parser.py
 │   ├── semantic_matcher.py
+│   ├── scoring_engine.py
+│   ├── text_processor.py
 │   ├── file_parser.py
 │
 │── frontend/
@@ -103,7 +142,7 @@ honorsProject/
 
 ## 🚀 Setup Instructions
 
-### 🔹 Backend (inside honorsProject)
+### 🔹 Backend
 
 ```bash
 cd honorsProject
@@ -148,12 +187,12 @@ npm run dev
   {
     "rank": 1,
     "name": "John Doe",
-    "score": 0.82,
+    "score": 0.78,
     "details": {
-      "skills": ["python", "machine learning"],
+      "skills": ["python", "sql"],
       "matched_skills": ["python"],
       "missing_skills": ["react"],
-      "explanation": "Matched Skills: python | Missing Skills: react"
+      "explanation": "Semantic: 0.72, Skills: 0.50, Experience: 0.60, Projects: 0.80, Education: 1.00"
     }
   }
 ]
@@ -163,39 +202,44 @@ npm run dev
 
 ## 📊 Workflow
 
-1. Recruiter uploads JD (file or text)
-2. Uploads multiple resumes
-3. Clicks **Analyse**
+1. Upload Job Description (file or text)
+2. Upload multiple resumes
+3. Click **Analyse**
 4. System returns:
 
    * Ranked candidates
    * Skill match insights
+   * Score breakdown
 
 ---
 
 ## ⚠️ Limitations
 
+* Skill extraction is rule-based (limited skill list)
+* Experience extraction is regex-based (approximate)
 * Name extraction is heuristic
-* Skill extraction is rule-based
+* No database or persistence layer
 * Uses pre-trained embeddings (not fine-tuned)
 
 ---
 
 ## 🔮 Future Improvements
 
-* Fine-tuned ML models
-* Better skill ontology
+* Expanded skill ontology (100+ skills)
+* Named Entity Recognition (NER) for better parsing
+* Fine-tuned embedding models
 * Resume–JD highlighting
-* Feedback-based learning
+* Dashboard with filters and analytics
+* Feedback-based learning system
 
 ---
 
 ## 📌 Conclusion
 
-This project demonstrates how **NLP and transformer-based models** can automate resume screening and improve recruitment efficiency.
+Resume Analyzer demonstrates how **NLP and transformer-based models** can automate resume screening by combining **semantic understanding with structured scoring**, making recruitment faster and more consistent.
 
 ---
 
 ## 👨‍💻 Author
 
-Developed as part of an academic ML project focused on intelligent recruitment systems.
+Developed as part of an academic project on intelligent recruitment systems.
