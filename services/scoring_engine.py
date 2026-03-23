@@ -8,7 +8,7 @@ class ScoringEngine:
     def calculate_experience_score(self, exp, min_exp):
         if min_exp == 0:
             return 1
-        return min(exp / min_exp, 1)
+        return min(exp / max(min_exp, 1), 1)
 
     def calculate_project_score(self, proj, intern):
         return min((proj + intern) / 5, 1)
@@ -20,10 +20,9 @@ class ScoringEngine:
 
     def compute_final_score(self, f):
         return (
-            0.3 * f["semantic_similarity"] +
-            0.2 * f["role_similarity"] +
+            0.4 * f["semantic_similarity"] +
             0.2 * f["skill_match_ratio"] +
-            0.1 * f["experience_score"] +
-            0.1 * f["project_score"] +
+            0.15 * f["experience_score"] +
+            0.15 * f["project_score"] +
             0.1 * f["education_match_score"]
         )

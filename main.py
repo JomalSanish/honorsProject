@@ -9,10 +9,12 @@ from typing import List
 from services.resume_parser import ResumeParser
 from services.semantic_matcher import SemanticMatcher
 from services.file_parser import FileParser
+from services.scoring_engine import ScoringEngine
+from services.text_processor import TextProcessor
 
 app = FastAPI()
 
-# ✅ CORS
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,9 +24,11 @@ app.add_middleware(
 )
 
 # SERVICES
-resume_parser = ResumeParser()
-semantic_matcher = SemanticMatcher()
+parser = ResumeParser()
+matcher = SemanticMatcher()
 file_parser = FileParser()
+scorer = ScoringEngine()
+processor = TextProcessor()
 
 
 @app.post("/rank-resumes-files")
@@ -35,46 +39,90 @@ async def rank_resumes_files(
 ):
     try:
         # -------- JD PROCESSING --------
-        jd_text = job_description or ""
+        jd_text_raw = job_description.strip()
 
         if jd_file:
             jd_bytes = await jd_file.read()
-
             if jd_file.filename.endswith(".pdf"):
-                jd_text += file_parser.parse_pdf(jd_bytes)
+                jd_text_raw += " " + file_parser.parse_pdf(jd_bytes)
             elif jd_file.filename.endswith(".docx"):
-                jd_text += file_parser.parse_docx(jd_bytes)
+                jd_text_raw += " " + file_parser.parse_docx(jd_bytes)
 
-        # 🔥 Extract JD skills dynamically (IMPORTANT)
-        jd_skills = resume_parser.extract_skills(jd_text)
+        if not jd_text_raw:
+            raise HTTPException(status_code=400, detail="Job description required")
 
-        # -------- RESUME PROCESSING --------
+        # Clean only for semantic comparison
+        jd_text_clean = processor.clean_text(jd_text_raw)
+
+        # Extract features from RAW text
+        jd_features = parser.parse(jd_text_raw)
+        jd_skills = jd_features["skills"]
+
         results = []
 
+        # -------- RESUME PROCESSING --------
         for file in resumes:
             file_bytes = await file.read()
 
             if file.filename.endswith(".pdf"):
-                text = file_parser.parse_pdf(file_bytes)
+                text_raw = file_parser.parse_pdf(file_bytes)
             elif file.filename.endswith(".docx"):
-                text = file_parser.parse_docx(file_bytes)
+                text_raw = file_parser.parse_docx(file_bytes)
             else:
-                text = file_bytes.decode()
+                try:
+                    text_raw = file_bytes.decode()
+                except:
+                    continue
 
-            parsed = resume_parser.parse(text)
+            # Clean only for similarity
+            text_clean = processor.clean_text(text_raw)
 
-            # 🔥 PURE JD MATCH
-            score = semantic_matcher.compute_similarity(text, jd_text)
+            # Parse RAW text (IMPORTANT FIX)
+            parsed = parser.parse(text_raw)
 
-            candidate_skills = parsed.get("skills", [])
+            # -------- FEATURE SCORES --------
+            semantic_score = matcher.compute_similarity(text_clean, jd_text_clean)
 
-            matched = list(set(candidate_skills) & set(jd_skills))
-            missing = list(set(jd_skills) - set(candidate_skills))
+            skill_score = scorer.calculate_skill_match(
+                parsed["skills"], jd_skills
+            )
+
+            exp_score = scorer.calculate_experience_score(
+                parsed["experience_years"], jd_features["experience_years"]
+            )
+
+            proj_score = scorer.calculate_project_score(
+                parsed["project_count"],
+                parsed["internship_count"]
+            )
+
+            edu_score = scorer.calculate_education_match(
+                parsed["education_degree"],
+                jd_features["education_degree"]
+            )
+
+            final_score = scorer.compute_final_score({
+                "semantic_similarity": semantic_score,
+                "skill_match_ratio": skill_score,
+                "experience_score": exp_score,
+                "project_score": proj_score,
+                "education_match_score": edu_score
+            })
+
+            matched = list(set(parsed["skills"]) & set(jd_skills))
+            missing = list(set(jd_skills) - set(parsed["skills"]))
 
             results.append({
-                "name": parsed.get("name", "Unknown"),
-                "score": score,
-                "skills": candidate_skills,
+                "name": parsed["name"],
+                "score": final_score,
+                "breakdown": {
+                    "semantic": semantic_score,
+                    "skills": skill_score,
+                    "experience": exp_score,
+                    "projects": proj_score,
+                    "education": edu_score
+                },
+                "skills": parsed["skills"],
                 "matched_skills": matched,
                 "missing_skills": missing
             })
@@ -84,21 +132,25 @@ async def rank_resumes_files(
 
         output = []
         for i, r in enumerate(results):
-
-            explanation = f"""
-Matched Skills: {', '.join(r['matched_skills']) if r['matched_skills'] else 'None'}
-Missing Skills: {', '.join(r['missing_skills']) if r['missing_skills'] else 'None'}
-"""
+            explanation = (
+                f"Semantic: {r['breakdown']['semantic']:.2f}, "
+                f"Skills: {r['breakdown']['skills']:.2f}, "
+                f"Experience: {r['breakdown']['experience']:.2f}, "
+                f"Projects: {r['breakdown']['projects']:.2f}, "
+                f"Education: {r['breakdown']['education']:.2f}\n"
+                f"Matched Skills: {', '.join(r['matched_skills']) or 'None'}\n"
+                f"Missing Skills: {', '.join(r['missing_skills']) or 'None'}"
+            )
 
             output.append({
                 "rank": i + 1,
                 "name": r["name"],
-                "score": round(r["score"], 2),
+                "score": round(r["score"], 3),
                 "details": {
                     "skills": r["skills"],
                     "matched_skills": r["matched_skills"],
                     "missing_skills": r["missing_skills"],
-                    "explanation": explanation.strip()
+                    "explanation": explanation
                 }
             })
 
