@@ -109,6 +109,10 @@ async def rank_resumes_files(
                 "education_match_score": edu_score
             })
 
+            # 🔥 NEW: Role mismatch penalty
+            if semantic_score < 0.55:
+                final_score *= 0.7
+
             matched = list(set(parsed["skills"]) & set(jd_skills))
             missing = list(set(jd_skills) - set(parsed["skills"]))
 
